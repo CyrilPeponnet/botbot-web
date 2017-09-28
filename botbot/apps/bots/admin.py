@@ -1,10 +1,11 @@
 """Django admin configuration for the bot objects.
 """
-import redis
 from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.forms.models import BaseInlineFormSet
+from django_slack_oauth.models import SlackUser
+
 
 from . import models
 
@@ -42,9 +43,7 @@ def botbot_refresh(modeladmin, request, queryset):
     """
     Ask daemon to reload configuration
     """
-    queue = redis.from_url(settings.REDIS_PLUGIN_QUEUE_URL)
-    queue.lpush('bot', 'REFRESH')
-botbot_refresh.short_description = "Reload botbot-bot configuration"
+    pass
 
 
 class ChannelForm(forms.ModelForm):
@@ -89,3 +88,4 @@ admin.site.register(PublicChannels, PublicChannelApproval)
 admin.site.register(models.ChatBot, ChatBotAdmin)
 admin.site.register(models.Channel, ChannelAdmin)
 admin.site.register(models.UserCount)
+admin.site.register(SlackUser)

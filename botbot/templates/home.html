@@ -1,22 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
+
     <section class="preview-box">
-        <h3>Featured channels</h3>
+        <h3>Public channels</h3>
         <ul class="channel-list">
-        {% cache 600 "signup-featured-channels-list" %}
-        {% for channel in featured_channels %}
+        {% for channel in public_channels %}
             <li><a href="{{ channel_url(channel, 'log_current') }}">{{ channel.name }}</a></li>
         {% endfor %}
-        {% endcache %}
         </ul>
     </section>
-
-    <ul class="channel-list-compact">
-    {% cache 600 "signup-public-channels" %}
-    {% for channel in public_not_featured_channels %}
-        <li><a href="{{ channel_url(channel, 'log_current') }}">{{ channel.name }}</a></li>
-    {% endfor %}
-    {% endcache %}
-    </ul>
+    {% if not request.user.is_authenticated() %}
+        <a href="{{ url('slack_auth') }}"><img alt="Sign in with Slack to see archives" height="40" width="172" src="https://platform.slack-edge.com/img/sign_in_with_slack.png" srcset="https://platform.slack-edge.com/img/sign_in_with_slack.png 1x, https://platform.slack-edge.com/img/sign_in_with_slack@2x.png 2x" /></a>
+    {%endif%}
 {% endblock content %}

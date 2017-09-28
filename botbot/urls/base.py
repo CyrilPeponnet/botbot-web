@@ -10,6 +10,7 @@ channel_patterns = patterns('',
 
 urlpatterns = patterns('',
                         (r'^$', LandingPage.as_view()),
+                        url(r'^slack/', include('django_slack_oauth.urls')),
                         url(r'^sitemap\.xml$', include('botbot.apps.sitemap.urls')),
 
                         url(r'^(?P<bot_slug>[\-\w\:\.]+(\@[\w]+)?)/(?P<channel_slug>[\-\w\.]+)/',

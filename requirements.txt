@@ -1,5 +1,4 @@
 django==1.8.4
-
 pytz
 Jinja2==2.7.3
 django-jinja==1.4.1
@@ -10,11 +9,20 @@ django-hstore==1.2.5
 # django-statsd-mozilla==0.3.12
 git+https://github.com/vbabiy/django-statsd.git@request-aggregation
 
+# oauth from slack
+django-slack-oauth
+
+# allow static content to be served through django
+whitenoise
+
+# Used for markdown test processing in logs
 markdown==2.3.1
-redis==2.9.1
+
 django-pipeline==1.5.1
-    # Requires java runtime
-    yuicompressor==2.4.8
+
+# Requires java runtime
+yuicompressor==2.4.8
+
 honcho==0.5.0
 
 djorm-ext-pgfulltext==0.9.0
@@ -34,4 +42,3 @@ geoip2==2.1.0
 
 # For plugins
 -e git+https://github.com/BotBotMe/botbot-plugins.git#egg=botbot-plugins
-

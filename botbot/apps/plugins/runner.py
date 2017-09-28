@@ -5,7 +5,6 @@ from datetime import datetime
 
 from django.utils.timezone import utc
 import re
-import redis
 import botbot_plugins.plugins
 from botbot_plugins.base import PrivateMessage
 from django.core.cache import cache
@@ -141,159 +140,9 @@ class Line(object):
     def __repr__(self):
         return str(self)
 
-
-class PluginRunner(object):
-    """
-    Registration and routing for plugins
-    Calls to plugins are done via greenlets
-    """
-
-    def __init__(self, use_gevent=False):
-        if use_gevent:
-            import gevent
-            self.gevent = gevent
-        self.bot_bus = redis.StrictRedis.from_url(
-            settings.REDIS_PLUGIN_QUEUE_URL)
-        self.storage = redis.StrictRedis.from_url(
-            settings.REDIS_PLUGIN_STORAGE_URL)
-        # plugins that listen to everything coming over the wire
-        self.firehose_router = {}
-        # plugins that listen to all messages (aka PRIVMSG)
-        self.messages_router = {}
-        # plugins that listen on direct messages (starting with bot nick)
-        self.mentions_router = {}
-
-    def register_all_plugins(self):
-        """Iterate over all plugins and register them with the app"""
-        for core_plugin in ['help', 'logger']:
-            mod = import_module('botbot.apps.plugins.core.{}'.format(core_plugin))
-            plugin = mod.Plugin()
-            self.register(plugin)
-        for mod in botbot_plugins.plugins.__all__:
-            plugin = import_module('botbot_plugins.plugins.' + mod).Plugin()
-            self.register(plugin)
-
-    def register(self, plugin):
-        """
-        Introspects the Plugin class instance provided for methods
-        that need to be registered with the internal app routers.
-        """
-        for key in dir(plugin):
-            try:
-                # the config attr bombs if accessed here because it tries
-                # to access an attribute from the dummyapp
-                attr = getattr(plugin, key)
-            except AttributeError:
-                continue
-            if (not key.startswith('__') and
-                    getattr(attr, 'route_rule', None)):
-                LOG.info('Route: %s.%s listens to %s for matches to %s',
-                         plugin.slug, key, attr.route_rule[0],
-                         attr.route_rule[1])
-                getattr(self, attr.route_rule[0] + '_router').setdefault(
-                    plugin.slug, []).append((attr.route_rule[1], attr, plugin))
-
-    def listen(self):
-        """Listens for incoming messages on the Redis queue"""
-        while 1:
-            val = None
-            try:
-                val = self.bot_bus.blpop('q', 1)
-
-                # Track q length
-                ql = self.bot_bus.llen('q')
-                statsd.gauge(".".join(["plugins", "q"]), ql)
-
-                if val:
-                    _, val = val
-                    LOG.debug('Recieved: %s', val)
-                    line = Line(json.loads(val), self)
-
-                    # Calculate the transport latency between go and the plugins.
-                    delta = datetime.utcnow().replace(tzinfo=utc) - line._received
-                    statsd.timing(".".join(["plugins", "latency"]),
-                                 delta.total_seconds() * 1000)
-
-                    if line.is_valid():
-                        self.dispatch(line)
-            except Exception:
-                LOG.error("Line Dispatch Failed", exc_info=True, extra={
-                    "line": val
-                })
-
-    def dispatch(self, line):
-        """Given a line, dispatch it to the right plugins & functions."""
-        # This is a pared down version of the `check_for_plugin_route_matches`
-        # method for firehose plugins (no regexing or return values)
-        active_firehose_plugins = line._active_plugin_slugs.intersection(
-            self.firehose_router.viewkeys())
-        for plugin_slug in active_firehose_plugins:
-            for _, func, plugin in self.firehose_router[plugin_slug]:
-                # firehose gets everything, no rule matching
-                LOG.info('Match: %s.%s', plugin_slug, func.__name__)
-                with statsd.timer(".".join(["plugins", plugin_slug])):
-                    # FIXME: This will not have correct timing if go back to
-                    # gevent.
-                    channel_plugin = self.setup_plugin_for_channel(
-                        plugin.__class__, line)
-                    new_func = log_on_error(LOG, getattr(channel_plugin,
-                                                         func.__name__))
-                    if hasattr(self, 'gevent'):
-                        self.gevent.Greenlet.spawn(new_func, line)
-                    else:
-                        channel_plugin.respond(new_func(line))
-
-        # pass line to other routers
-        if line._is_message:
-            self.check_for_plugin_route_matches(line, self.messages_router)
-
-            if line.is_direct_message:
-                self.check_for_plugin_route_matches(line, self.mentions_router)
-
-    def setup_plugin_for_channel(self, fake_plugin_class, line):
-        """Given a dummy plugin class, initialize it for the line's channel"""
-        class RealPlugin(RealPluginMixin, fake_plugin_class):
-            pass
-        plugin = RealPlugin(slug=fake_plugin_class.__module__.split('.')[-1],
-                            channel=line._channel,
-                            chatbot_id=line._chatbot_id,
-                            app=self)
-        return plugin
-
-    def check_for_plugin_route_matches(self, line, router):
-        """Checks the active plugins' routes and calls functions on matches"""
-        # get the active routes for this channel
-        active_slugs = line._active_plugin_slugs.intersection(router.viewkeys())
-        for plugin_slug in active_slugs:
-            for rule, func, plugin in router[plugin_slug]:
-                match = re.match(rule, line.text, re.IGNORECASE)
-                if match:
-                    LOG.info('Match: %s.%s', plugin_slug, func.__name__)
-                    with statsd.timer(".".join(["plugins", plugin_slug])):
-                        # FIXME: This will not have correct timing if go back to
-                        # gevent.
-                        # Instantiate a plugin specific to this channel
-                        channel_plugin = self.setup_plugin_for_channel(
-                            plugin.__class__, line)
-                        # get the method from the channel-specific plugin
-                        new_func = log_on_error(LOG, getattr(channel_plugin,
-                                                             func.__name__))
-                        if hasattr(self, 'gevent'):
-                            grnlt = self.gevent.Greenlet(new_func, line,
-                                                         **match.groupdict())
-                            grnlt.link_value(channel_plugin.greenlet_respond)
-                            grnlt.start()
-                        else:
-                            channel_plugin.respond(new_func(line,
-                                                            **match.groupdict()))
-
-
 def start_plugins(*args, **kwargs):
     """
     Used by the management command to start-up plugin listener
     and register the plugins.
     """
-    LOG.info('Starting plugins. Gevent=%s', kwargs['use_gevent'])
-    app = PluginRunner(**kwargs)
-    app.register_all_plugins()
-    app.listen()
+    pass

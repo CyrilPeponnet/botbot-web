@@ -47,6 +47,7 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.admindocs',
     'django.contrib.sitemaps',
+    'django_slack_oauth',
 
     'bootstrap_toolkit',
 )
@@ -133,7 +134,7 @@ TEMPLATES = [
             os.path.join(os.path.dirname(pipeline.__file__), 'templates'),
         ],
         'OPTIONS': {
-            'environment': 'botbot.jinja2.environment',
+            'environment': 'botbot.jinja2_settings.environment',
         },
     },
     {
@@ -178,12 +179,20 @@ MIDDLEWARE_CLASSES = (
 #============================================================================
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+
 AUTHENTICATION_BACKENDS += (
     'django.contrib.auth.backends.ModelBackend',
 
     # `allauth` specific authentication methods, such as login by e-mail
     "allauth.account.auth_backends.AuthenticationBackend",
 )
+
+SLACK_CLIENT_ID = os.environ.get('SLACK_CLIENT_ID')
+SLACK_CLIENT_SECRET = os.environ.get('SLACK_CLIENT_SECRET')
+SLACK_SCOPE = 'identify,groups:read'
+SLACK_SUCCESS_REDIRECT_URL = '/'
+
+SLACK_PIPELINES = ['botbot.apps.bots.pipelines.register_user', 'botbot.apps.bots.pipelines.log_user_in']
 
 #==============================================================================
 # Logger project settings

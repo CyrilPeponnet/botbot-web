@@ -6,11 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 
-    <title>{% block head_title %} | BotBot.me [o__o]{% endblock %}</title>
+    <title>{% block head_title %} | Slack Archives{% endblock %}</title>
 
     {# Defined in botbot.settings._asset_pipeline #}
     {% stylesheet "screen" %}
     <!-- Font Awesome - http://fortawesome.github.com/Font-Awesome -->
+    <link rel="stylesheet" type="text/css" href="/static/css/pygment.css" />
 
     <link href='//fonts.googleapis.com/css?family=Droid+Sans:400,700' rel='stylesheet' type='text/css'>
     <link href='//fonts.googleapis.com/css?family=Droid+Serif:400,700,700italic,400italic' rel='stylesheet' type='text/css'>
@@ -33,15 +34,10 @@
   </div>
 {% endblock %}
 
-{% block footer %}
-  {% include "includes/footer.html" %}
-{% endblock %}
-
 {# Defined in botbot.settings._asset_pipeline #}
 {% javascript "app" %}
 
 {% block extra_js %}{% endblock extra_js %}
 
-{% include "includes/google-analytics.html" %}
 </body>
 </html>

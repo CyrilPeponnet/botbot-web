@@ -3,9 +3,12 @@ from django.core.urlresolvers import reverse_lazy
 from django.http.response import Http404
 from django.shortcuts import get_object_or_404
 from django.views.generic.list import ListView
+from django.core.urlresolvers import reverse
+from django_slack_oauth.models import SlackUser
 
 from . import models
-
+from django.conf import settings
+import requests
 
 class ChannelMixin(object):
     """
@@ -34,10 +37,27 @@ class ChannelMixin(object):
         """
         Add the channel as an attribute of the view.
         """
+        if not request.user.is_authenticated():
+            return http.HttpResponseRedirect("/")
+
         try:
             self.channel = self.get_channel(user=request.user, **kwargs)
         except self.LegacySlugUsage, e:
             return http.HttpResponsePermanentRedirect(e.url)
+
+        # Check if user can access the requested channel (private channels)
+        if not self.channel.is_public:
+            # get user token
+            slacker, _ = SlackUser.objects.get_or_create(slacker=request.user)
+            url = "https://slack.com/api/groups.list"
+            data = {"token": slacker.access_token}
+            r = requests.get(url, params=data)
+            if r.status_code == 200:
+                for group in r.json().get('groups'):
+                    if self.channel.slug == group['id']:
+                        break
+                else:
+                    raise http.Http404("You are not part of this private group.")
 
         return super(ChannelMixin, self).dispatch(request, *args, **kwargs)
 
@@ -81,7 +101,7 @@ class ChannelMixin(object):
         If no matching channel is found, raises 404.
         """
         candidates = self._channel_queryset()\
-            .filter(slug=channel_slug, is_public=True)\
+            .filter(slug=channel_slug)\
             .select_related('chatbot')
 
         # Return first channel that has a bot matching the current bot_slug.
@@ -106,8 +126,7 @@ class ChannelList(ListView):
     def get_queryset(self, *args, **kwargs):
         qs = super(ChannelList, self).get_queryset(*args, **kwargs)
         return qs.filter(
-            chatbot__slug=self.kwargs['network_slug'],
-            is_public=True).active()
+            chatbot__slug=self.kwargs['network_slug'],is_public=True).active()
 
     def get_context_data(self, **kwargs):
         data = super(ChannelList, self).get_context_data(**kwargs)

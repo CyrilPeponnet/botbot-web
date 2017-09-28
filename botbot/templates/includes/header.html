@@ -1,5 +1,8 @@
 <header id="Site-Header" class="navbar navbar-inverse navbar-fixed-top">
     <div class="navbar-inner">
+        {% if not request.user.is_authenticated() %}
+            <p align="center"><b>You are not signed!</b></p>
+        {%endif%}
         <div class="container-fluid">
             <a href="/" class="main-btn"><i class="icon icon-list-ul"> </i></a>
             <nav id="Primary-Nav"></nav>
