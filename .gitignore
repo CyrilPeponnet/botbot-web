@@ -6,5 +6,7 @@ docs/_build
 settings_debug.py
 .DS_Store
 node_modules/
+static/
+src/
 venv/
 .idea/
