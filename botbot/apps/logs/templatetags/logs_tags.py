@@ -10,6 +10,8 @@ from django.utils import six
 from django.utils.html import (TRAILING_PUNCTUATION, WRAPPING_PUNCTUATION,
                                word_split_re, simple_url_re, smart_urlquote,
                                simple_url_2_re, simple_email_re, escape)
+from markdown import markdown
+
 import re
 
 
@@ -22,16 +24,16 @@ YOUTUBE = 2
 
 @register.filter(is_safe=True, needs_autoescape=True)
 @stringfilter
-def bbme_urlizetrunc(value, limit, autoescape=None):
+def bbme_urlizetrunc(value):
     """
     Converts URLs into clickable links, truncating URLs to the given character
     limit, and adding 'rel=nofollow' attribute to discourage spamming.
 
     Argument: Length to truncate URLs to.
     """
-    return mark_safe(urlize_impl(value, trim_url_limit=int(limit), nofollow=True,
-                            autoescape=autoescape))
-
+    # return mark_safe(urlize_impl(value, trim_url_limit=int(limit), nofollow=True,
+    #                         autoescape=autoescape))
+    return mark_safe(markdown(value, extensions=['markdown.extensions.fenced_code','markdown.extensions.nl2br']))
 
 def is_embeddable(url):
     """

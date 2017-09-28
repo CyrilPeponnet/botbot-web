@@ -17,9 +17,9 @@
                     <div class="nick-color{{ line.get_nick_color() }} actor">{{ line.nick }}</div>
                 {%- endif %}
                 {%- set last_nick = line.nick %}
-                <div class="message">{{ bbme_urlizetrunc(line.text|e, 50) }}</div>
+                <div class="message">{{ bbme_urlizetrunc(line.text) }}</div>
             {%- else %}
-                <div class="message"><em>{{ bbme_urlizetrunc(line.text|e, 50) }}</em></div>
+                <div class="message"><em>{{ bbme_urlizetrunc(line.text) }}</em></div>
             {%- endif %}
     {%- else %}
         {# JOIN, PART, QUIT, NICK, etc #}
